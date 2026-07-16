@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "electron-rebuild"
   },
   "dependencies": {
     "react": "^19.2.7",
