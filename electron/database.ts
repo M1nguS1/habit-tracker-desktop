@@ -3,9 +3,8 @@ import path from 'path';
 import { app } from 'electron';
 
 // 1. Determinar dónde se guardará físicamente el archivo .db en tu Fedora
-const dbPath = app.isPackaged
-  ? path.join(app.getPath('userData'), 'habits_tracker.db')
-  : path.join(process.cwd(), 'habits_tracker.db');
+// Forzamos a que tanto en desarrollo como empaquetado se guarde fuera de la carpeta del proyecto
+const dbPath = path.join(app.getPath('userData'), 'habits_tracker.db');
 
 // 2. Conectar (o crear) la base de datos en esa ruta
 const db = new Database(dbPath, { verbose: console.log });

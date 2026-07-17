@@ -1,122 +1,85 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect } from 'react';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+// 1. Definimos los tipos de la API expuesta en el preload
+interface Task {
+  id: number;
+  name: string;
+  periodicity: string;
 }
 
-export default App
+declare global {
+  interface Window {
+    api: {
+      createTask: (name: string, periodicity: string) => Promise<{ id: number; success: boolean }>;
+      getTasks: () => Promise<Task[]>;
+    };
+  }
+}
+
+function App() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [name, setName] = useState('');
+  const [periodicity, setPeriodicity] = useState('daily');
+
+  // 2. Cargar las tareas existentes al iniciar la app
+  useEffect(() => {
+    async function loadTasks() {
+      const existingTasks = await window.api.getTasks();
+      setTasks(existingTasks);
+    }
+    loadTasks();
+  }, []);
+
+  // 3. Manejar el envío del formulario hacia SQLite
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    const result = await window.api.createTask(name, periodicity);
+    if (result.success) {
+      // Refrescar la lista de tareas tras guardar localmente
+      const updatedTasks = await window.api.getTasks();
+      setTasks(updatedTasks);
+      setName(''); // Limpiar el input
+    }
+  };
+
+  return (
+    <div className="container">
+      <h1>Habit Tracker 🚀</h1>
+      
+      {/* Formulario de Creación */}
+      <form onSubmit={handleSubmit} className="task-form">
+        <input 
+          type="text" 
+          placeholder="Nombre del hábito (ej. Ir al gimnasio)" 
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        
+        <select value={periodicity} onChange={(e) => setPeriodicity(e.target.value)}>
+          <option value="daily">Diario</option>
+          <option value="weekly">Semanal</option>
+          <option value="monthly">Mensual</option>
+        </select>
+        
+        <button type="submit">Añadir Hábito</button>
+      </form>
+
+      {/* Listado de Tareas */}
+      <h2>Mis Hábitos</h2>
+      <ul className="task-list">
+        {tasks.map((task) => (
+          <li key={task.id} className="task-item">
+            <strong>{task.name}</strong> 
+            <span className="badge">{task.periodicity}</span>
+          </li>
+        ))}
+        {tasks.length === 0 && <p className="empty-state">No hay hábitos creados aún. ¡Empieza uno nuevo arriba!</p>}
+      </ul>
+    </div>
+  );
+}
+
+export default App;
