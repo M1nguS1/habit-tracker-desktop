@@ -15,6 +15,14 @@ export default defineConfig({
       {
         // Punto de entrada del proceso principal de Electron
         entry: 'electron/main.ts',
+        vite: {
+          build: {
+            rollupOptions: {
+              // Le decimos a Vite que no empaquete better-sqlite3 en el main process
+              external: ['better-sqlite3'],
+            },
+          },
+        },
       },
       {
         entry: 'electron/preload.ts',
