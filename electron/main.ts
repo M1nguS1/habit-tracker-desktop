@@ -48,6 +48,18 @@ app.whenReady().then(() => {
     return stmt.all()
   })
 
+  // Canal para ELIMINAR una tarea por ID
+  ipcMain.handle('db:delete-task', (_event, id: number) => {
+    try {
+      const stmt = db.prepare('DELETE FROM tasks WHERE id = ?')
+      stmt.run(id)
+      return { success: true }
+    } catch (error: any) {
+      console.error('Error al eliminar de la base de datos:', error)
+      return { success: false, error: error.message }
+    }
+  })  
+  
   createWindow()
 
   app.on('activate', () => {

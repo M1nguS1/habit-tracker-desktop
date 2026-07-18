@@ -8,4 +8,7 @@ contextBridge.exposeInMainWorld('api', {
     
   // Solicitar todas las tareas de la base de datos
   getTasks: () => ipcRenderer.invoke('db:get-tasks'),
+
+  // Borrar una tarea por su ID
+  deleteTask: (id: number) => ipcRenderer.invoke('db:delete-task', id),
 });

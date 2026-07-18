@@ -13,6 +13,7 @@ declare global {
     api: {
       createTask: (name: string, periodicity: string) => Promise<{ id: number; success: boolean }>;
       getTasks: () => Promise<Task[]>;
+      deleteTask: (id: number) => Promise<{ success: boolean }>; // <-- Declaración añadida
     };
   }
 }
@@ -42,6 +43,16 @@ function App() {
       const updatedTasks = await window.api.getTasks();
       setTasks(updatedTasks);
       setName(''); // Limpiar el input
+    }
+  };
+
+  // 4. Ejecutar la eliminación del hábito por su ID
+  const handleDelete = async (id: number) => {
+    const result = await window.api.deleteTask(id);
+    if (result.success) {
+      // Refrescar inmediatamente la lista del estado local
+      const updatedTasks = await window.api.getTasks();
+      setTasks(updatedTasks);
     }
   };
 
@@ -114,14 +125,24 @@ function App() {
             {tasks.map((task) => (
               <li 
                 key={task.id} 
-                className="flex justify-between items-center p-4 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm"
+                className="flex justify-between items-center p-4 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
               >
-                <strong className="font-medium text-slate-900 dark:text-slate-100">
-                  {task.name}
-                </strong> 
-                <span className="text-xs px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium capitalize">
-                  {task.periodicity}
-                </span>
+                <div className="flex flex-col gap-1">
+                  <strong className="font-medium text-slate-900 dark:text-slate-100">
+                    {task.name}
+                  </strong> 
+                  <span className="w-max text-[10px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold uppercase tracking-wider">
+                    {task.periodicity}
+                  </span>
+                </div>
+                
+                <button
+                  onClick={() => handleDelete(task.id)}
+                  className="text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-200 dark:hover:border-red-900/50 transition-all cursor-pointer"
+                  title="Eliminar hábito"
+                >
+                  Eliminar
+                </button>
               </li>
             ))}
           </ul>
