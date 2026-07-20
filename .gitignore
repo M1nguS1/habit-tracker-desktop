@@ -25,6 +25,7 @@ dist-ssr
 
 # Electron compilation
 dist-electron/
+dist-built/
 
 # SQLite databases
 *.db
