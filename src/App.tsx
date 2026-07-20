@@ -1,58 +1,94 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 
-// 1. Definimos los tipos de la API expuesta en el preload
 interface Task {
   id: number;
   name: string;
   periodicity: string;
 }
 
+// 1. Declaración de tipos actualizada para el puente IPC
 declare global {
   interface Window {
     api: {
       createTask: (name: string, periodicity: string) => Promise<{ id: number; success: boolean }>;
       getTasks: () => Promise<Task[]>;
-      deleteTask: (id: number) => Promise<{ success: boolean }>; // <-- Declaración añadida
+      deleteTask: (id: number) => Promise<{ success: boolean }>;
+      toggleTask: (taskId: number, date: string, isCompleted: boolean) => Promise<{ success: boolean }>;
+      getCompletionsByDate: (date: string) => Promise<number[]>;
     };
   }
 }
+
+// Helper para obtener la fecha de hoy en formato local YYYY-MM-DD
+const getTodayString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [name, setName] = useState('');
   const [periodicity, setPeriodicity] = useState('daily');
 
-  // 2. Cargar las tareas existentes al iniciar la app desde SQLite
+  // 2. Nuevo Estado: Almacena los IDs de las tareas que ya se hicieron HOY
+  const [completedToday, setCompletedToday] = useState<number[]>([]);
+  
+  // Guardamos el string de la fecha de hoy de forma estática
+  const todayStr = getTodayString();
+
+  // 3. Efecto de carga inicial modificado: trae tareas y sus estados de hoy
   useEffect(() => {
-    async function loadTasks() {
+    async function loadData() {
       const existingTasks = await window.api.getTasks();
       setTasks(existingTasks);
+      
+      const completedIds = await window.api.getCompletionsByDate(todayStr);
+      setCompletedToday(completedIds);
     }
-    loadTasks();
-  }, []);
+    loadData();
+  }, [todayStr]);
 
-  // 3. Manejar el envío del formulario hacia SQLite
+  // Manejar el envío del formulario hacia SQLite
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
     const result = await window.api.createTask(name, periodicity);
     if (result.success) {
-      // Refrescar la lista de tareas tras guardar localmente
       const updatedTasks = await window.api.getTasks();
       setTasks(updatedTasks);
-      setName(''); // Limpiar el input
+      setName('');
     }
   };
 
-  // 4. Ejecutar la eliminación del hábito por su ID
+  // Ejecutar la eliminación del hábito por su ID
   const handleDelete = async (id: number) => {
     const result = await window.api.deleteTask(id);
     if (result.success) {
-      // Refrescar inmediatamente la lista del estado local
       const updatedTasks = await window.api.getTasks();
       setTasks(updatedTasks);
+      // Limpiamos también el ID del estado diario por si se borra estando completada hoy
+      setCompletedToday(prev => prev.filter(taskId => taskId !== id));
+    }
+  };
+
+  // 4. NUEVA FUNCIÓN: Gestionar el cambio del checkbox en la base de datos y UI
+  const handleToggle = async (id: number, isCurrentCompleted: boolean) => {
+    const newStatus = !isCurrentCompleted;
+    const result = await window.api.toggleTask(id, todayStr, newStatus);
+    
+    if (result.success) {
+      if (newStatus) {
+        // Añadir ID al array si se marcó
+        setCompletedToday(prev => [...prev, id]);
+      } else {
+        // Remover ID del array si se desmarcó
+        setCompletedToday(prev => prev.filter(taskId => taskId !== id));
+      }
     }
   };
 
@@ -122,29 +158,51 @@ function App() {
           </p>
         ) : (
           <ul className="space-y-2 p-0 list-none">
-            {tasks.map((task) => (
-              <li 
-                key={task.id} 
-                className="flex justify-between items-center p-4 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
-              >
-                <div className="flex flex-col gap-1">
-                  <strong className="font-medium text-slate-900 dark:text-slate-100">
-                    {task.name}
-                  </strong> 
-                  <span className="w-max text-[10px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold uppercase tracking-wider">
-                    {task.periodicity}
-                  </span>
-                </div>
-                
-                <button
-                  onClick={() => handleDelete(task.id)}
-                  className="text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-200 dark:hover:border-red-900/50 transition-all cursor-pointer"
-                  title="Eliminar hábito"
+            {tasks.map((task) => {
+              // Comprobamos si el ID del hábito está en nuestra lista de completados de hoy
+              const isCompleted = completedToday.includes(task.id);
+
+              return (
+                <li 
+                  key={task.id} 
+                  className={`flex justify-between items-center p-4 rounded-lg border shadow-sm transition-all duration-200 ${
+                    isCompleted 
+                      ? 'bg-slate-50/80 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 opacity-75' 
+                      : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
                 >
-                  Eliminar
-                </button>
-              </li>
-            ))}
+                  <div className="flex items-center gap-4">
+                    {/* Checkbox Interactiva */}
+                    <input 
+                      type="checkbox"
+                      checked={isCompleted}
+                      onChange={() => handleToggle(task.id, isCompleted)}
+                      className="w-5 height-5 rounded border-slate-300 dark:border-slate-700 text-purple-600 focus:ring-purple-500 cursor-pointer accent-purple-600"
+                    />
+
+                    <div className="flex flex-col gap-1">
+                      {/* Texto dinámico: añade un tachado si está hecho */}
+                      <strong className={`font-medium transition-all text-slate-900 dark:text-slate-100 ${
+                        isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : ''
+                      }`}>
+                        {task.name}
+                      </strong> 
+                      <span className="w-max text-[10px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold uppercase tracking-wider">
+                        {task.periodicity}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => handleDelete(task.id)}
+                    className="text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-200 dark:hover:border-red-900/50 transition-all cursor-pointer"
+                    title="Eliminar hábito"
+                  >
+                    Eliminar
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

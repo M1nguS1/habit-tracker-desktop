@@ -58,7 +58,39 @@ app.whenReady().then(() => {
       console.error('Error al eliminar de la base de datos:', error)
       return { success: false, error: error.message }
     }
-  })  
+  }) 
+  
+  // Canal para MARCAR / DESMARCAR una tarea como completada
+  ipcMain.handle('db:toggle-task', (_event, { taskId, date, isCompleted }) => {
+    try {
+      if (isCompleted) {
+        // Al marcar el checkbox, registramos el completado para ese día
+        const stmt = db.prepare('INSERT INTO task_completions (task_id, completed_date) VALUES (?, ?)')
+        stmt.run(taskId, date)
+      } else {
+        // Al desmarcarlo, eliminamos ese registro específico
+        const stmt = db.prepare('DELETE FROM task_completions WHERE task_id = ? AND completed_date = ?')
+        stmt.run(taskId, date)
+      }
+      return { success: true }
+    } catch (error: any) {
+      console.error('Error al modificar completado en la DB:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  // Canal para OBTENER los IDs completados hoy
+  ipcMain.handle('db:get-completions-date', (_event, date: string) => {
+    try {
+      const stmt = db.prepare('SELECT task_id FROM task_completions WHERE completed_date = ?')
+      const rows = stmt.all(date) as { task_id: number }[]
+      // Retornamos un array plano de números, ej: [1, 4, 7]
+      return rows.map(row => row.task_id)
+    } catch (error) {
+      console.error('Error al obtener completados de la DB:', error)
+      return []
+    }
+  })
   
   createWindow()
 
