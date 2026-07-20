@@ -7,7 +7,6 @@ interface Task {
   periodicity: string;
 }
 
-// 1. Declaración de tipos actualizada para el puente IPC
 declare global {
   interface Window {
     api: {
@@ -16,11 +15,11 @@ declare global {
       deleteTask: (id: number) => Promise<{ success: boolean }>;
       toggleTask: (taskId: number, date: string, isCompleted: boolean) => Promise<{ success: boolean }>;
       getCompletionsByDate: (date: string) => Promise<number[]>;
+      getStats: () => Promise<{ success: boolean; totalCompletions: number }>;
     };
   }
 }
 
-// Helper para obtener la fecha de hoy en formato local YYYY-MM-DD
 const getTodayString = () => {
   const today = new Date();
   const year = today.getFullYear();
@@ -33,14 +32,21 @@ function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [name, setName] = useState('');
   const [periodicity, setPeriodicity] = useState('daily');
-
-  // 2. Nuevo Estado: Almacena los IDs de las tareas que ya se hicieron HOY
   const [completedToday, setCompletedToday] = useState<number[]>([]);
+  const [totalCompletions, setTotalCompletions] = useState(0);
   
-  // Guardamos el string de la fecha de hoy de forma estática
+  // NUEVO ESTADO: Filtro de vista ('all', 'daily', 'weekly', 'monthly')
+  const [filter, setFilter] = useState('daily'); // Por defecto iniciamos en 'daily' para no distorsionar el día
+  
   const todayStr = getTodayString();
 
-  // 3. Efecto de carga inicial modificado: trae tareas y sus estados de hoy
+  const refreshStats = async () => {
+    const stats = await window.api.getStats();
+    if (stats.success) {
+      setTotalCompletions(stats.totalCompletions);
+    }
+  };
+
   useEffect(() => {
     async function loadData() {
       const existingTasks = await window.api.getTasks();
@@ -48,11 +54,12 @@ function App() {
       
       const completedIds = await window.api.getCompletionsByDate(todayStr);
       setCompletedToday(completedIds);
+
+      await refreshStats();
     }
     loadData();
   }, [todayStr]);
 
-  // Manejar el envío del formulario hacia SQLite
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -65,32 +72,42 @@ function App() {
     }
   };
 
-  // Ejecutar la eliminación del hábito por su ID
   const handleDelete = async (id: number) => {
     const result = await window.api.deleteTask(id);
     if (result.success) {
       const updatedTasks = await window.api.getTasks();
       setTasks(updatedTasks);
-      // Limpiamos también el ID del estado diario por si se borra estando completada hoy
       setCompletedToday(prev => prev.filter(taskId => taskId !== id));
+      await refreshStats();
     }
   };
 
-  // 4. NUEVA FUNCIÓN: Gestionar el cambio del checkbox en la base de datos y UI
   const handleToggle = async (id: number, isCurrentCompleted: boolean) => {
     const newStatus = !isCurrentCompleted;
     const result = await window.api.toggleTask(id, todayStr, newStatus);
     
     if (result.success) {
       if (newStatus) {
-        // Añadir ID al array si se marcó
         setCompletedToday(prev => [...prev, id]);
       } else {
-        // Remover ID del array si se desmarcó
         setCompletedToday(prev => prev.filter(taskId => taskId !== id));
       }
+      await refreshStats();
     }
   };
+
+  // 1. FILTRADO DE TAREAS EN TIEMPO REAL
+  const filteredTasks = tasks.filter(task => {
+    if (filter === 'all') return true;
+    return task.periodicity === filter;
+  });
+
+  // 2. CÁLCULO DE PROGRESO CORREGIDO (Solo evalúa los hábitos que pasan el filtro)
+  const filteredCompletedToday = filteredTasks.filter(task => completedToday.includes(task.id));
+  
+  const todayPercentage = filteredTasks.length > 0 
+    ? Math.round((filteredCompletedToday.length / filteredTasks.length) * 100) 
+    : 0;
 
   return (
     <div className="p-8 max-w-2xl mx-auto text-left">
@@ -102,6 +119,41 @@ function App() {
           Gestiona y monitoriza tus rutinas diarias conectadas a tu base de datos local.
         </p>
       </header>
+
+      {/* PANEL DE ESTADÍSTICAS VISUALES DINÁMICAS */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        {/* Tarjeta 1: Progreso Basado en el Filtro */}
+        <div className="bg-gradient-to-br from-purple-500 to-indigo-600 p-5 rounded-xl text-white shadow-md">
+          <span className="text-xs font-semibold uppercase tracking-wider opacity-80">
+            Progreso de Hoy ({filter === 'all' ? 'Todos' : filter === 'daily' ? 'Diarios' : filter === 'weekly' ? 'Semanales' : 'Mensuales'})
+          </span>
+          <div className="text-3xl font-bold mt-1">{todayPercentage}%</div>
+          <div className="w-full bg-white/20 h-1.5 rounded-full mt-3 overflow-hidden">
+            <div 
+              className="bg-white h-full transition-all duration-300" 
+              style={{ width: `${todayPercentage}%` }}
+            ></div>
+          </div>
+          <p className="text-[11px] opacity-75 mt-2">
+            {filteredCompletedToday.length} de {filteredTasks.length} hábitos evaluados
+          </p>
+        </div>
+
+        {/* Tarjeta 2: Historial Global Inalterado */}
+        <div className="bg-white dark:bg-slate-950 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Logros Históricos Totales
+            </span>
+            <div className="text-3xl font-bold mt-1 text-slate-900 dark:text-slate-100">
+              {totalCompletions}
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
+            Veces que has completado tus rutinas desde el inicio.
+          </p>
+        </div>
+      </section>
 
       {/* Formulario de Creación */}
       <section className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-xl border border-slate-200 dark:border-slate-800 mb-8">
@@ -146,20 +198,49 @@ function App() {
         </form>
       </section>
 
-      {/* Listado de Tareas */}
+      {/* SECCIÓN DE HÁBITOS CON FILTRO INTERACTIVO */}
       <section>
-        <h2 className="text-xl font-semibold mb-4 text-slate-900 dark:text-slate-100">
-          Mis Hábitos Activos
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+            Mis Hábitos Activos
+          </h2>
+          
+          {/* Selector de filtros con diseño encapsulado */}
+          <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 self-start sm:self-auto">
+            <button 
+              onClick={() => setFilter('all')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${filter === 'all' ? 'bg-white dark:bg-slate-800 text-purple-600 shadow-xs' : 'text-slate-600 dark:text-slate-400 opacity-80'}`}
+            >
+              Todos
+            </button>
+            <button 
+              onClick={() => setFilter('daily')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${filter === 'daily' ? 'bg-white dark:bg-slate-800 text-purple-600 shadow-xs' : 'text-slate-600 dark:text-slate-400 opacity-80'}`}
+            >
+              Diarios
+            </button>
+            <button 
+              onClick={() => setFilter('weekly')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${filter === 'weekly' ? 'bg-white dark:bg-slate-800 text-purple-600 shadow-xs' : 'text-slate-600 dark:text-slate-400 opacity-80'}`}
+            >
+              Semanales
+            </button>
+            <button 
+              onClick={() => setFilter('monthly')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${filter === 'monthly' ? 'bg-white dark:bg-slate-800 text-purple-600 shadow-xs' : 'text-slate-600 dark:text-slate-400 opacity-80'}`}
+            >
+              Mensuales
+            </button>
+          </div>
+        </div>
         
-        {tasks.length === 0 ? (
-          <p className="text-sm opacity-60 italic p-4 bg-slate-100/50 dark:bg-slate-900/30 rounded-lg border border-dashed border-slate-200 dark:border-slate-800">
-            No hay hábitos creados aún. ¡Empieza uno nuevo arriba!
+        {filteredTasks.length === 0 ? (
+          <p className="text-sm opacity-60 italic p-4 bg-slate-100/50 dark:bg-slate-100/30 rounded-lg border border-dashed border-slate-200 dark:border-slate-800">
+            No hay hábitos activos bajo la categoría "{filter === 'all' ? 'Todos' : filter === 'daily' ? 'Diarios' : filter === 'weekly' ? 'Semanales' : 'Mensuales'}".
           </p>
         ) : (
           <ul className="space-y-2 p-0 list-none">
-            {tasks.map((task) => {
-              // Comprobamos si el ID del hábito está en nuestra lista de completados de hoy
+            {filteredTasks.map((task) => {
               const isCompleted = completedToday.includes(task.id);
 
               return (
@@ -172,16 +253,14 @@ function App() {
                   }`}
                 >
                   <div className="flex items-center gap-4">
-                    {/* Checkbox Interactiva */}
                     <input 
                       type="checkbox"
                       checked={isCompleted}
                       onChange={() => handleToggle(task.id, isCompleted)}
-                      className="w-5 height-5 rounded border-slate-300 dark:border-slate-700 text-purple-600 focus:ring-purple-500 cursor-pointer accent-purple-600"
+                      className="w-5 h-5 rounded border-slate-300 dark:border-slate-700 text-purple-600 focus:ring-purple-500 cursor-pointer accent-purple-600"
                     />
 
                     <div className="flex flex-col gap-1">
-                      {/* Texto dinámico: añade un tachado si está hecho */}
                       <strong className={`font-medium transition-all text-slate-900 dark:text-slate-100 ${
                         isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : ''
                       }`}>
@@ -195,7 +274,7 @@ function App() {
                   
                   <button
                     onClick={() => handleDelete(task.id)}
-                    className="text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-200 dark:hover:border-red-900/50 transition-all cursor-pointer"
+                    className="text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-200 dark:hover:border-red-200 transition-all cursor-pointer"
                     title="Eliminar hábito"
                   >
                     Eliminar

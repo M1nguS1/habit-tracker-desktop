@@ -92,6 +92,23 @@ app.whenReady().then(() => {
     }
   })
   
+  // Canal para OBTENER estadisticas de completado por tarea
+  ipcMain.handle('db:get-stats', () => {
+    try {
+      // Contamos cuántas filas totales existen en el historial de completados
+      const stmt = db.prepare('SELECT COUNT(*) as total FROM task_completions')
+      const row = stmt.get() as { total: number }
+      
+      return {
+        success: true,
+        totalCompletions: row.total
+      }
+    } catch (error: any) {
+      console.error('Error al calcular estadísticas en la DB:', error)
+      return { success: false, totalCompletions: 0, error: error.message }
+    }
+  })
+  
   createWindow()
 
   app.on('activate', () => {
