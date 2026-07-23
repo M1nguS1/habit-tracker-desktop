@@ -1,7 +1,12 @@
-import { app, BrowserWindow, ipcMain } from 'electron' // 1. Añadimos 'ipcMain' aquí
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import db, { initDatabase } from './database.js' // 2. Importamos tu base de datos (.js por ES Modules)
+import db, {
+  initDatabase,
+  isTaskCompletedInCurrentPeriod,
+  getCompletionsByDateRange,
+  getCompletionsByPeriodicity
+} from './database.js'
 
 // Crear el equivalente a _dirname de forma segura para ES Modules dentro de Electron
 const _filename = fileURLToPath(import.meta.url)
@@ -16,7 +21,6 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      // Ahora _dirname apuntará correctamente a la carpeta dist-electron en ejecución
       preload: path.join(_dirname, 'preload.js'),
     },
   })
@@ -30,11 +34,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // 3. Inicializar la base de datos al arrancar la app
   initDatabase()
 
-  // 4. Escuchar las peticiones del Frontend (React)
-  
   // Canal para GUARDAR una tarea nueva
   ipcMain.handle('db:create-task', (_event, { name, periodicity }) => {
     const stmt = db.prepare('INSERT INTO tasks (name, periodicity) VALUES (?, ?)')
@@ -58,17 +59,15 @@ app.whenReady().then(() => {
       console.error('Error al eliminar de la base de datos:', error)
       return { success: false, error: error.message }
     }
-  }) 
-  
+  })
+
   // Canal para MARCAR / DESMARCAR una tarea como completada
   ipcMain.handle('db:toggle-task', (_event, { taskId, date, isCompleted }) => {
     try {
       if (isCompleted) {
-        // Al marcar el checkbox, registramos el completado para ese día
         const stmt = db.prepare('INSERT INTO task_completions (task_id, completed_date) VALUES (?, ?)')
         stmt.run(taskId, date)
       } else {
-        // Al desmarcarlo, eliminamos ese registro específico
         const stmt = db.prepare('DELETE FROM task_completions WHERE task_id = ? AND completed_date = ?')
         stmt.run(taskId, date)
       }
@@ -79,26 +78,24 @@ app.whenReady().then(() => {
     }
   })
 
-  // Canal para OBTENER los IDs completados hoy
+  // Canal para OBTENER los IDs completados en una fecha específica
   ipcMain.handle('db:get-completions-date', (_event, date: string) => {
     try {
       const stmt = db.prepare('SELECT task_id FROM task_completions WHERE completed_date = ?')
       const rows = stmt.all(date) as { task_id: number }[]
-      // Retornamos un array plano de números, ej: [1, 4, 7]
       return rows.map(row => row.task_id)
     } catch (error) {
       console.error('Error al obtener completados de la DB:', error)
       return []
     }
   })
-  
-  // Canal para OBTENER estadisticas de completado por tarea
+
+  // Canal para OBTENER estadísticas de completado
   ipcMain.handle('db:get-stats', () => {
     try {
-      // Contamos cuántas filas totales existen en el historial de completados
       const stmt = db.prepare('SELECT COUNT(*) as total FROM task_completions')
       const row = stmt.get() as { total: number }
-      
+
       return {
         success: true,
         totalCompletions: row.total
@@ -108,7 +105,18 @@ app.whenReady().then(() => {
       return { success: false, totalCompletions: 0, error: error.message }
     }
   })
-  
+
+  // NUEVO: Handler para obtener completadas en el ciclo actual (por periodicidad)
+  ipcMain.handle('db:get-completions-by-period', (_event, periodicity: string) => {
+    try {
+      const completedIds = getCompletionsByPeriodicity(periodicity as any)
+      return completedIds
+    } catch (error) {
+      console.error('Error al obtener completadas por período:', error)
+      return []
+    }
+  })
+
   createWindow()
 
   app.on('activate', () => {

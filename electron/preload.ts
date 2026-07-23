@@ -22,4 +22,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // Solicitar el recuento total de hábitos completados históricamente
   getStats: () => ipcRenderer.invoke('db:get-stats'),
+
+  // NUEVO: Obtener completadas en el ciclo actual (día/semana/mes)
+  getCompletionsByPeriod: (periodicity: string) =>
+    ipcRenderer.invoke('db:get-completions-by-period', periodicity),
 });

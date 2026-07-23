@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
+import { getTodayString } from './utils/dateHelpers';
 
 interface Task {
   id: number;
@@ -16,27 +17,21 @@ declare global {
       toggleTask: (taskId: number, date: string, isCompleted: boolean) => Promise<{ success: boolean }>;
       getCompletionsByDate: (date: string) => Promise<number[]>;
       getStats: () => Promise<{ success: boolean; totalCompletions: number }>;
+      getCompletionsByPeriod: (periodicity: string) => Promise<number[]>;
     };
   }
 }
-
-const getTodayString = () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [name, setName] = useState('');
   const [periodicity, setPeriodicity] = useState('daily');
   const [completedToday, setCompletedToday] = useState<number[]>([]);
+  const [completedByPeriod, setCompletedByPeriod] = useState<number[]>([]);
   const [totalCompletions, setTotalCompletions] = useState(0);
   
   // NUEVO ESTADO: Filtro de vista ('all', 'daily', 'weekly', 'monthly')
-  const [filter, setFilter] = useState('daily'); // Por defecto iniciamos en 'daily' para no distorsionar el día
+  const [filter, setFilter] = useState('daily');
   
   const todayStr = getTodayString();
 
@@ -47,6 +42,7 @@ function App() {
     }
   };
 
+  // Cargar datos iniciales y cuando cambia el filtro
   useEffect(() => {
     async function loadData() {
       const existingTasks = await window.api.getTasks();
@@ -55,10 +51,16 @@ function App() {
       const completedIds = await window.api.getCompletionsByDate(todayStr);
       setCompletedToday(completedIds);
 
+      // NUEVO: Cargar completadas según el filtro actual
+      if (filter !== 'all') {
+        const completedInPeriod = await window.api.getCompletionsByPeriod(filter);
+        setCompletedByPeriod(completedInPeriod);
+      }
+
       await refreshStats();
     }
     loadData();
-  }, [todayStr]);
+  }, [todayStr, filter]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +80,7 @@ function App() {
       const updatedTasks = await window.api.getTasks();
       setTasks(updatedTasks);
       setCompletedToday(prev => prev.filter(taskId => taskId !== id));
+      setCompletedByPeriod(prev => prev.filter(taskId => taskId !== id));
       await refreshStats();
     }
   };
@@ -89,8 +92,10 @@ function App() {
     if (result.success) {
       if (newStatus) {
         setCompletedToday(prev => [...prev, id]);
+        setCompletedByPeriod(prev => [...prev, id]);
       } else {
         setCompletedToday(prev => prev.filter(taskId => taskId !== id));
+        setCompletedByPeriod(prev => prev.filter(taskId => taskId !== id));
       }
       await refreshStats();
     }
@@ -102,11 +107,14 @@ function App() {
     return task.periodicity === filter;
   });
 
-  // 2. CÁLCULO DE PROGRESO CORREGIDO (Solo evalúa los hábitos que pasan el filtro)
-  const filteredCompletedToday = filteredTasks.filter(task => completedToday.includes(task.id));
+  // 2. SELECCIONAR QUÉ COMPLETADAS USAR SEGÚN EL FILTRO
+  const completionIds = filter === 'all' ? completedToday : completedByPeriod;
   
-  const todayPercentage = filteredTasks.length > 0 
-    ? Math.round((filteredCompletedToday.length / filteredTasks.length) * 100) 
+  // 3. CÁLCULO DE PROGRESO CORREGIDO
+  const filteredCompleted = filteredTasks.filter(task => completionIds.includes(task.id));
+  
+  const progressPercentage = filteredTasks.length > 0 
+    ? Math.round((filteredCompleted.length / filteredTasks.length) * 100) 
     : 0;
 
   return (
@@ -125,17 +133,17 @@ function App() {
         {/* Tarjeta 1: Progreso Basado en el Filtro */}
         <div className="bg-gradient-to-br from-purple-500 to-indigo-600 p-5 rounded-xl text-white shadow-md">
           <span className="text-xs font-semibold uppercase tracking-wider opacity-80">
-            Progreso de Hoy ({filter === 'all' ? 'Todos' : filter === 'daily' ? 'Diarios' : filter === 'weekly' ? 'Semanales' : 'Mensuales'})
+            Progreso ({filter === 'all' ? 'Todos' : filter === 'daily' ? 'Hoy' : filter === 'weekly' ? 'Esta Semana' : 'Este Mes'})
           </span>
-          <div className="text-3xl font-bold mt-1">{todayPercentage}%</div>
+          <div className="text-3xl font-bold mt-1">{progressPercentage}%</div>
           <div className="w-full bg-white/20 h-1.5 rounded-full mt-3 overflow-hidden">
             <div 
               className="bg-white h-full transition-all duration-300" 
-              style={{ width: `${todayPercentage}%` }}
+              style={{ width: `${progressPercentage}%` }}
             ></div>
           </div>
           <p className="text-[11px] opacity-75 mt-2">
-            {filteredCompletedToday.length} de {filteredTasks.length} hábitos evaluados
+            {filteredCompleted.length} de {filteredTasks.length} hábitos completados
           </p>
         </div>
 
@@ -241,7 +249,7 @@ function App() {
         ) : (
           <ul className="space-y-2 p-0 list-none">
             {filteredTasks.map((task) => {
-              const isCompleted = completedToday.includes(task.id);
+              const isCompleted = completionIds.includes(task.id);
 
               return (
                 <li 
