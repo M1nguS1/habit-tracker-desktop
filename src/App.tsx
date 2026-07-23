@@ -112,107 +112,119 @@ function App() {
     filteredTasks.length > 0 ? Math.round((filteredCompleted.length / filteredTasks.length) * 100) : 0;
 
   return (
-    <div className="p-8 max-w-2xl mx-auto text-left bg-emerald-50 min-h-screen">
-      <header className="mb-8">
-        <h1 className="text-4xl font-bold tracking-tight mb-2 text-emerald-900">Habit Tracker 🌱</h1>
-        <p className="text-sm text-emerald-700 opacity-90">
-          Gestiona y monitoriza tus rutinas de forma clara, simple y alineada a tu día a día.
-        </p>
+    <div className="px-0 w-full max-w-full text-left bg-emerald-50 min-h-screen" style={{ paddingTop: '1.25rem' }}>
+      <header style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: '2rem', paddingTop: '0.25rem' }}>
+        <h1 style={{ margin: '0 auto', width: 'fit-content', textAlign: 'center' }} className="text-4xl font-bold tracking-tight mb-2 text-emerald-900">
+          Habit Tracker 🌱
+        </h1>
       </header>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 p-5 rounded-xl text-white shadow-md">
-          <span className="text-xs font-semibold uppercase tracking-wider opacity-80">
-            Progreso ({filter === 'all' ? 'Todos' : filter === 'daily' ? 'Hoy' : filter === 'weekly' ? 'Esta Semana' : 'Este Mes'})
+      <section className="grid gap-4 lg:grid-cols-[1.7fr_0.9fr] mb-8 ml-0 px-4">
+        <div className="bg-white p-4 pl-0 rounded-xl border border-emerald-200 shadow-sm ml-0">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-start gap-4 justify-start w-full pl-0 ml-0">
+                <label className="block flex-none text-sm text-emerald-800" style={{ width: '100px' }}>
+                  <span className="block mb-2">Nuevo Hábito: </span>
+                  <input
+                    type="text"
+                    placeholder="Ej. Meditar" 
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    style={{ width: '100px' }}
+                  />
+                </label>
+
+                <label className="w-[180px] min-w-[180px] text-sm text-emerald-800">
+                  <span className="block mb-2">Periodicidad:</span>
+                  <select
+                    value={periodicity}
+                    onChange={e => setPeriodicity(e.target.value)}
+                    className="w-full rounded-xl border border-emerald-200 bg-white px-4 py-3 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="daily">Diario</option>
+                    <option value="weekly">Semanal</option>
+                    <option value="monthly">Mensual</option>
+                  </select>
+                </label>
+
+                <button
+                  type="submit"
+                  aria-label="Crear hábito"
+                  className="self-start inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-300/50 transition hover:bg-emerald-700 active:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+                >
+                  ➕
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl border border-emerald-200 shadow-sm">
+          <span className="text-xs font-semibold uppercase tracking-wider text-emerald-500">
+            Estadísticas
           </span>
-          <div className="text-3xl font-bold mt-1">{progressPercentage}%</div>
-          <div className="w-full bg-white/20 h-1.5 rounded-full mt-3 overflow-hidden">
-            <div className="bg-white h-full transition-all duration-300" style={{ width: `${progressPercentage}%` }}></div>
+          <div className="mt-5 grid gap-5">
+            <div className="rounded-3xl bg-white border border-slate-300 p-5 shadow-sm">
+              <p className="text-sm font-semibold text-slate-700">Progreso actual</p>
+              <div className="relative mt-4 h-12 w-full rounded-full bg-slate-300 overflow-hidden border border-slate-400">
+                <div
+                  style={{
+                    width: progressPercentage === 0 ? '10px' : `${progressPercentage}%`,
+                    minWidth: '10px',
+                    transition: 'width 300ms ease',
+                  }}
+                  className="h-full rounded-full bg-emerald-500"
+                />
+                <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-900">
+                  {progressPercentage}%
+                </span>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-4 text-sm text-slate-600">
+                <span>{filter === 'all' ? 'Todos' : filter === 'daily' ? 'Hoy' : filter === 'weekly' ? 'Esta Semana' : 'Este Mes'}</span>
+                <span className="font-semibold text-slate-800">{progressPercentage}% completado</span>
+              </div>
+            </div>
+            <div className="rounded-3xl bg-emerald-50 border border-emerald-200 p-5">
+              <p className="text-sm uppercase tracking-wider text-emerald-500">Total completados</p>
+              <div className="text-4xl font-bold text-emerald-900 mt-3">{totalCompletions}</div>
+            </div>
           </div>
-          <p className="text-[11px] opacity-75 mt-2">
-            {filteredCompleted.length} de {filteredTasks.length} hábitos completados
-          </p>
-        </div>
-
-        <div className="bg-white p-5 rounded-xl border border-emerald-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-500">
-              Logros Históricos Totales
-            </span>
-            <div className="text-3xl font-bold mt-1 text-emerald-900">{totalCompletions}</div>
-          </div>
-          <p className="text-[11px] text-emerald-600 mt-2">
-            Veces que has completado tus rutinas desde el inicio.
-          </p>
         </div>
       </section>
 
-      <section className="bg-white p-6 rounded-xl border border-emerald-200 mb-8 shadow-sm">
-        <h2 className="text-xl font-semibold mb-4 text-emerald-900">Crear Nuevo Hábito</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <section className="bg-white p-6 rounded-xl border border-emerald-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <div>
-            <label className="block text-xs font-medium uppercase tracking-wider mb-2 text-emerald-800 opacity-80">
-              Nombre del hábito
-            </label>
-            <input
-              type="text"
-              placeholder="Ej. Ir al gimnasio, Meditar..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+            <h2 className="text-xl font-semibold text-emerald-900">Mis Hábitos Activos</h2>
+            <p className="text-sm text-emerald-600 mt-1">
+              Filtra tus hábitos para ver su progreso.
+            </p>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium uppercase tracking-wider mb-2 text-emerald-800 opacity-80">
-              Periodicidad
-            </label>
-            <select
-              value={periodicity}
-              onChange={(e) => setPeriodicity(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border border-emerald-200 bg-white text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="daily">Diario</option>
-              <option value="weekly">Semanal</option>
-              <option value="monthly">Mensual</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
-          >
-            Añadir Hábito
-          </button>
-        </form>
-      </section>
-
-      <section>
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
-          <h2 className="text-xl font-semibold text-emerald-900">Mis Hábitos Activos</h2>
-
-          <div className="flex bg-white p-1 rounded-lg border border-emerald-200 self-start sm:self-auto shadow-sm">
+          <div className="flex bg-emerald-50 p-1 rounded-xl border border-emerald-200">
             <button
               onClick={() => setFilter('all')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${filter === 'all' ? 'bg-emerald-50 text-emerald-700 shadow' : 'text-emerald-600 opacity-80'}`}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${filter === 'all' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-600 opacity-80'}`}
             >
               Todos
             </button>
             <button
               onClick={() => setFilter('daily')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${filter === 'daily' ? 'bg-emerald-50 text-emerald-700 shadow' : 'text-emerald-600 opacity-80'}`}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${filter === 'daily' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-600 opacity-80'}`}
             >
               Diarios
             </button>
             <button
               onClick={() => setFilter('weekly')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${filter === 'weekly' ? 'bg-emerald-50 text-emerald-700 shadow' : 'text-emerald-600 opacity-80'}`}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${filter === 'weekly' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-600 opacity-80'}`}
             >
               Semanales
             </button>
             <button
               onClick={() => setFilter('monthly')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${filter === 'monthly' ? 'bg-emerald-50 text-emerald-700 shadow' : 'text-emerald-600 opacity-80'}`}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${filter === 'monthly' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-600 opacity-80'}`}
             >
               Mensuales
             </button>
@@ -220,24 +232,23 @@ function App() {
         </div>
 
         {filteredTasks.length === 0 ? (
-          <p className="text-sm opacity-70 italic p-4 bg-white rounded-lg border border-emerald-200">
+          <p className="text-sm opacity-70 italic p-4 bg-emerald-50 rounded-xl border border-emerald-200">
             No hay hábitos activos bajo la categoría "{filter === 'all' ? 'Todos' : filter === 'daily' ? 'Diarios' : filter === 'weekly' ? 'Semanales' : 'Mensuales'}".
           </p>
         ) : (
-          <ul className="space-y-2 p-0 list-none">
+          <ul className="space-y-3 p-0 list-none">
             {filteredTasks.map((task) => {
               const isCompleted = completionIds.includes(task.id);
 
               return (
                 <li
                   key={task.id}
-                  className={`flex justify-between items-center p-4 rounded-lg border shadow-sm transition-all duration-200 ${
-                    isCompleted
-                      ? 'bg-emerald-50 border-emerald-200 opacity-95'
-                      : 'bg-white border-emerald-100 hover:border-emerald-300'
-                  }`}
+                  className={`flex items-center justify-between gap-4 p-4 rounded-xl border shadow-sm transition-all duration-200 ${isCompleted
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : 'bg-white border-emerald-100 hover:border-emerald-200'
+                    }`}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
                     <input
                       type="checkbox"
                       checked={isCompleted}
@@ -245,15 +256,11 @@ function App() {
                       className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
                     />
 
-                    <div className="flex flex-col gap-1">
-                      <strong
-                        className={`font-medium transition-all text-emerald-900 ${
-                          isCompleted ? 'line-through text-emerald-500' : ''
-                        }`}
-                      >
+                    <div className="min-w-0">
+                      <p className={`font-medium ${isCompleted ? 'line-through text-emerald-500' : 'text-emerald-900'}`}>
                         {task.name}
-                      </strong>
-                      <span className="w-max text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold uppercase tracking-wider">
+                      </p>
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-800">
                         {task.periodicity}
                       </span>
                     </div>
